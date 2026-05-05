@@ -1,7 +1,5 @@
 <div align="center">
 
-<img src="https://capsule-render.vercel.app/api?type=waving&color=0:0b0c10,50:1f2833,100:0b0c10&height=160&section=header&text=ReconMatt&fontSize=52&fontColor=00ff41&fontAlignY=42&desc=Automated%20Reconnaissance%20%26%20OSINT%20Tool&descAlignY=62&descSize=16&animation=fadeIn" width="100%"/>
-
 <br/>
 
 [![Python](https://img.shields.io/badge/Python-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://github.com/MishitaDodani)
@@ -12,7 +10,6 @@
 
 <br/>
 
-> *"The quieter you become, the more you are able to hear."* — Kali Linux
 
 </div>
 
