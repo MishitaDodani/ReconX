@@ -3,146 +3,114 @@
 import os
 import subprocess
 import sys
-import shutil
 from datetime import datetime
+
+# -----------------------------
+# Colors (CLI Styling)
+# -----------------------------
+GREEN = "\033[92m"
+RED = "\033[91m"
+YELLOW = "\033[93m"
+BLUE = "\033[94m"
+RESET = "\033[0m"
 
 # -----------------------------
 # Utility Functions
 # -----------------------------
+def log(msg, color=BLUE):
+    print(f"{color}[{datetime.now().strftime('%H:%M:%S')}] {msg}{RESET}")
 
-def log(msg):
-    print(f"[{datetime.now().strftime('%H:%M:%S')}] {msg}")
+def success(msg):
+    print(f"{GREEN}[✔] {msg}{RESET}")
 
-def check_tool(tool):
-    return shutil.which(tool) is not None
+def error(msg):
+    print(f"{RED}[✘] {msg}{RESET}")
 
 def run(cmd, outfile=None):
-    log(f"Running: {cmd}")
+    log(f"Running: {cmd}", YELLOW)
     try:
         if outfile:
             with open(outfile, "w") as f:
-                subprocess.run(cmd, shell=True, stdout=f, stderr=subprocess.DEVNULL)
+                result = subprocess.run(cmd, shell=True, stdout=f, stderr=subprocess.DEVNULL)
         else:
-            subprocess.run(cmd, shell=True)
+            result = subprocess.run(cmd, shell=True)
+
+        if result.returncode == 0:
+            success("Completed successfully")
+        else:
+            error("Command failed")
+
     except Exception as e:
-        log(f"[!] Error running command: {e}")
+        error(f"Error: {e}")
+
+# -----------------------------
+# Banner
+# -----------------------------
+def banner():
+    print(f"""{BLUE}
+   ____                        __  __
+  / __ \\___  ____ ___  ____ _/ /_/ /
+ / /_/ / _ \\/ __ `__ \\/ __ `/ __/ / 
+/ _, _/  __/ / / / / / /_/ / /_/ /  
+/_/ |_|\\___/_/ /_/ /_/\\__,_/\\__/_/   
+
+   🔍 Recon Automation Tool
+{RESET}""")
 
 # -----------------------------
 # Main Function
 # -----------------------------
-
 def main():
-    if len(sys.argv) < 2:
-        print("Usage: ./recon.py <target_domain> [fast/full]")
+    banner()
+
+    if len(sys.argv) != 2:
+        print("Usage: python3 recon.py <target_domain>")
         sys.exit(1)
 
     target = sys.argv[1]
-    mode = sys.argv[2] if len(sys.argv) == 3 else "fast"
-
     base_dir = f"recon_{target}"
     os.makedirs(base_dir, exist_ok=True)
 
-    log(f"Starting Recon on {target} (Mode: {mode.upper()})")
+    log(f"Starting Recon on {target}")
 
-    # -----------------------------
-    # 1. Nmap Scan
-    # -----------------------------
-    if check_tool("nmap"):
-        if mode == "fast":
-            cmd = f"nmap -sV -T4 {target}"
-        else:
-            cmd = f"nmap -p- -sV {target}"
+    # 1. Nmap
+    log("Step 1: Nmap Scan")
+    run(f"nmap -sV -T4 {target}", f"{base_dir}/nmap_scan.txt")
 
-        run(cmd, f"{base_dir}/nmap_scan.txt")
-        log("[✔] Nmap completed")
-    else:
-        log("[!] nmap not found, skipping...")
+    # 2. Nikto
+    log("Step 2: Nikto Scan")
+    run(f"nikto -h https://{target} -maxtime 300", f"{base_dir}/nikto.txt")
 
-    # -----------------------------
-    # 2. WAF Detection
-    # -----------------------------
-    if check_tool("wafw00f"):
-        run(f"wafw00f https://{target}", f"{base_dir}/waf.txt")
-        log("[✔] WAF detection completed")
-    else:
-        log("[!] wafw00f not found, skipping...")
+    # 3. WAF
+    log("Step 3: WAF Detection")
+    run(f"wafw00f https://{target}", f"{base_dir}/waf.txt")
 
-    # -----------------------------
-    # 3. WHOIS
-    # -----------------------------
-    if check_tool("whois"):
-        run(f"whois {target}", f"{base_dir}/whois.txt")
-        log("[✔] WHOIS completed")
-    else:
-        log("[!] whois not found, skipping...")
+    # 4. WHOIS
+    log("Step 4: WHOIS Lookup")
+    run(f"whois {target}", f"{base_dir}/whois.txt")
 
-    # -----------------------------
-    # 4. Subdomain Enumeration
-    # -----------------------------
+    # 5. Subdomains
+    log("Step 5: Subdomain Enumeration")
+
+    run(f"subfinder -d {target}", f"{base_dir}/subfinder.txt")
+    run(f"assetfinder --subs-only {target}", f"{base_dir}/assetfinder.txt")
+
     sub_file = f"{base_dir}/subdomains.txt"
+    run(f"cat {base_dir}/subfinder.txt {base_dir}/assetfinder.txt | sort -u > {sub_file}")
 
-    if check_tool("subfinder"):
-        run(f"subfinder -d {target}", f"{base_dir}/subfinder.txt")
-    else:
-        log("[!] subfinder not found")
-
-    if check_tool("assetfinder"):
-        run(f"assetfinder --subs-only {target}", f"{base_dir}/assetfinder.txt")
-    else:
-        log("[!] assetfinder not found")
-
-    # Combine results
-    run(
-        f"cat {base_dir}/*.txt 2>/dev/null | sort -u > {sub_file}"
-    )
-    log("[✔] Subdomain enumeration completed")
-
-    # -----------------------------
-    # 5. Live Host Check
-    # -----------------------------
+    # 6. Live Hosts
+    log("Step 6: Live Host Detection")
     live_file = f"{base_dir}/live_hosts.txt"
+    run(f"cat {sub_file} | httprobe -s -p https:443", live_file)
 
-    if check_tool("httprobe"):
-        run(f"cat {sub_file} | httprobe -s -p https:443", live_file)
-        log("[✔] Live hosts identified")
-    else:
-        log("[!] httprobe not found")
+    # 7. Screenshots
+    log("Step 7: Screenshot Capture")
+    gowitness_dir = f"{base_dir}/gowitness"
+    os.makedirs(gowitness_dir, exist_ok=True)
+    run(f"gowitness scan file -f {live_file} --destination {gowitness_dir}")
 
-    # -----------------------------
-    # 6. Screenshots
-    # -----------------------------
-    if check_tool("gowitness"):
-        gowitness_dir = f"{base_dir}/gowitness"
-        os.makedirs(gowitness_dir, exist_ok=True)
-        run(f"gowitness scan file -f {live_file} --destination {gowitness_dir}")
-        log("[✔] Screenshots captured")
-    else:
-        log("[!] gowitness not found")
-
-    # -----------------------------
-    # 7. Nikto (LAST – slow)
-    # -----------------------------
-    if check_tool("nikto"):
-        run(
-            f"nikto -h https://{target} -maxtime 300",
-            f"{base_dir}/nikto.txt"
-        )
-        log("[✔] Nikto scan completed")
-    else:
-        log("[!] nikto not found")
-
-    # -----------------------------
-    # 8. Optional Deep Scan
-    # -----------------------------
-    if mode == "full" and check_tool("nmap"):
-        run(
-            f"nmap --script dns-brute {target}",
-            f"{base_dir}/dns_brute.txt"
-        )
-        log("[✔] DNS brute completed")
-
-    log("\n[🎉] Recon completed successfully!")
-    log(f"[📁] Results saved in: {base_dir}")
+    log("\nRecon completed successfully!", GREEN)
+    log(f"Results saved in: {base_dir}", GREEN)
 
 # -----------------------------
 # Entry Point
