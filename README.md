@@ -15,9 +15,9 @@
 
 ---
 
-## 🔍 What is ReconMatt?
+## 🔍 What is ReconX?
 
-**ReconMatt** is a **Python-based automated reconnaissance tool** designed for penetration testers and bug bounty hunters. It chains together industry-standard security tools into a single, clean pipeline — from port scanning to live host detection to screenshot capture — saving hours of manual recon work.
+**ReconX** is a **Python-based automated reconnaissance tool** designed for penetration testers and bug bounty hunters. It chains together industry-standard security tools into a single, clean pipeline — from port scanning to live host detection to screenshot capture — saving hours of manual recon work.
 
 Built with colored CLI output and step-by-step logging, it gives you full visibility into every phase of the recon process.
 
